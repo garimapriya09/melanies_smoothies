@@ -4,6 +4,44 @@ import streamlit as st
 # from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark.functions import col
 
+import snowflake.connector
+
+st.title("Snowflake MFA Connection")
+
+mfa_code = st.text_input(
+    "Enter your current 6-digit MFA code",
+    type="password",
+    max_chars=6,
+)
+
+if st.button("Connect to Snowflake"):
+    if not mfa_code.isdigit() or len(mfa_code) != 6:
+        st.error("Enter a valid 6-digit MFA code.")
+    else:
+        try:
+            cfg = st.secrets["connections"]["snowflake"]
+
+            from snowflake.snowpark import Session
+
+            session = Session.builder.configs({
+                "account": cfg["account"],
+                "user": cfg["user"],
+                "password": cfg["password"],
+                "passcode": mfa_code,
+                "authenticator": "username_password_mfa",
+                "warehouse": cfg["warehouse"],
+                "database": cfg["database"],
+                "schema": cfg["schema"],
+                "role": cfg["role"],
+            }).create()
+
+            st.session_state["snowpark_session"] = session
+            st.success("Connected to Snowflake!")
+
+        except Exception as e:
+            st.error(f"Connection failed: {e}")
+
+
 # Write directly to the app
 st.title(f":cup_with_straw: Customize Your Smoothie! :cup_with_straw:")
 st.write(
@@ -13,9 +51,15 @@ st.write(
 name_on_order = st.text_input("Name on Smoothie:")
 st.write("The name on your smoothie will be: ", name_on_order)
 
-cnx = st.connection("snowflake")
-session = cnx.session()
+# cnx = st.connection("snowflake")
+# session = cnx.session()
 # session = get_active_session()
+
+session = st.session_state.get("snowpark_session")
+
+if session is None:
+    st.info("Please connect to Snowflake first.")
+    st.stop()
 my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
 # st.dataframe(data=my_dataframe, use_container_width=True)
 
@@ -23,7 +67,7 @@ my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT
 ingredients_list = st.multiselect(
     "Choose upto 5 ingredients:",
     my_dataframe,
-    max_selections = 6
+    max_selections = 5
 )
 
 if ingredients_list:
