@@ -2,6 +2,8 @@
 
 snowflake-snowpark-python
 streamlit
+snowflake-connector-python
+pyotp
 
 
 # name: app_environment
